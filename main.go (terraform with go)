@@ -9,13 +9,14 @@ import (
 )
 
 func main() {
-    // Set AWS profile
-    os.Setenv("AWS_PROFILE", "aws_riya_root") 
-
-    // Change to the terraform directory
+    //os.Setenv("AWS_PROFILE", "aws_riya_root") 
+	awsProfile := readProfile("config.properties")
+    if awsProfile == "" {
+        fmt.Println("AWS profile not found")
+        return
+    }
     os.Chdir("terraform")
 
-    // Initialize Terraform
     fmt.Println("Initializing Terraform...")
     cmd := exec.Command("terraform", "init")
     if err := cmd.Run(); err != nil {
@@ -23,7 +24,6 @@ func main() {
         return
     }
 
-    // Run Terraform plan
     fmt.Println("Planning Terraform changes...")
     cmd = exec.Command("terraform", "plan")
     output, err := cmd.CombinedOutput()
@@ -34,9 +34,8 @@ func main() {
     fmt.Println("Terraform plan output:")
     fmt.Println(string(output))
 
-    // Apply Terraform configuration with a timeout
     fmt.Println("Applying Terraform configuration...")
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute) // Adjust the timeout as needed
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute) 
     defer cancel()
 
     cmd = exec.CommandContext(ctx, "terraform", "apply", "-auto-approve")
@@ -50,7 +49,6 @@ func main() {
         return
     }
 
-    // Get the output
     fmt.Println("Retrieving Terraform outputs...")
     cmd = exec.Command("terraform", "output", "-json")
     output, err = cmd.CombinedOutput()
@@ -61,4 +59,30 @@ func main() {
 
     fmt.Println("Terraform outputs:")
     fmt.Println(string(output))
+}
+
+
+func readProfile(filename string) string {
+    file, err := os.Open(filename)
+    if err != nil {
+        fmt.Println("Error opening config file:", err)
+        return ""
+    }
+    defer file.Close()
+
+    var line string
+    for {
+        _, err := fmt.Fscanln(file, &line)
+        if err != nil {
+            break
+        }
+        if line == "" {
+            continue
+        }
+        if line[:12] == "aws_profile=" {
+            return line[12:] 
+        }
+    }
+
+    return ""
 }
