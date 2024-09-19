@@ -1,0 +1,64 @@
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "os/exec"
+    "time"
+)
+
+func main() {
+    // Set AWS profile
+    os.Setenv("AWS_PROFILE", "aws_riya_root") 
+
+    // Change to the terraform directory
+    os.Chdir("terraform")
+
+    // Initialize Terraform
+    fmt.Println("Initializing Terraform...")
+    cmd := exec.Command("terraform", "init")
+    if err := cmd.Run(); err != nil {
+        fmt.Printf("Error initializing Terraform: %v\n", err)
+        return
+    }
+
+    // Run Terraform plan
+    fmt.Println("Planning Terraform changes...")
+    cmd = exec.Command("terraform", "plan")
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        fmt.Printf("Error running Terraform plan: %v\nOutput: %s\n", err, output)
+        return
+    }
+    fmt.Println("Terraform plan output:")
+    fmt.Println(string(output))
+
+    // Apply Terraform configuration with a timeout
+    fmt.Println("Applying Terraform configuration...")
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute) // Adjust the timeout as needed
+    defer cancel()
+
+    cmd = exec.CommandContext(ctx, "terraform", "apply", "-auto-approve")
+    output, err = cmd.CombinedOutput()
+    if ctx.Err() == context.DeadlineExceeded {
+        fmt.Println("Terraform apply command timed out.")
+        return
+    }
+    if err != nil {
+        fmt.Printf("Error applying Terraform: %v\nOutput: %s\n", err, output)
+        return
+    }
+
+    // Get the output
+    fmt.Println("Retrieving Terraform outputs...")
+    cmd = exec.Command("terraform", "output", "-json")
+    output, err = cmd.CombinedOutput()
+    if err != nil {
+        fmt.Printf("Error getting output: %v\nOutput: %s\n", err, output)
+        return
+    }
+
+    fmt.Println("Terraform outputs:")
+    fmt.Println(string(output))
+}
